@@ -1,76 +1,35 @@
-import socket
-import sys
-import os
-import mimetypes
-from threading import Thread
+# ================= server_multi.py =================
+import socket, os, mimetypes, sys          # modul core
+from threading import Thread               # buat multi-thread
 
-def build_and_send_response(conn, path):
-    if path == '/':
-        path = '/index.html'
-
-    filepath = '.' + path
-    if not os.path.isfile(filepath):
+def send_resp(c, p):                       # kirim file / 404
+    p = '/index.html' if p == '/' else p
+    f = '.' + p
+    if not os.path.isfile(f):
         body = b"<h1>404 Not Found</h1>"
-        header = (
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/html\r\n"
-            f"Content-Length: {len(body)}\r\n"
-            "\r\n"
-        )
-        conn.sendall(header.encode() + body)
-        return
+        c.sendall(f"HTTP/1.1 404\r\nContent-Type:text/html\r\nContent-Length:{len(body)}\r\n\r\n".encode()+body); return
+    d = open(f, 'rb').read()
+    ct = mimetypes.guess_type(f)[0] or 'application/octet-stream'
+    c.sendall(f"HTTP/1.1 200 OK\r\nContent-Type:{ct}\r\nContent-Length:{len(d)}\r\n\r\n".encode()+d)
 
-    with open(filepath, 'rb') as f:
-        body = f.read()
-
-    content_type = mimetypes.guess_type(filepath)[0] or 'application/octet-stream'
-    header = (
-        "HTTP/1.1 200 OK\r\n"
-        f"Content-Type: {content_type}\r\n"
-        f"Content-Length: {len(body)}\r\n"
-        "\r\n"
-    )
-    conn.sendall(header.encode() + body)
-
-def handle_client(conn, addr):
+def worker(c, a):                          # thread per klien
+    print(f"[Multi] {a}")
     try:
-        print(f"[Multi] Serving {addr} ...")
-        request = conn.recv(1024).decode('iso-8859-1')
-        if not request:
-            return
-        request_line = request.splitlines()[0]
-        method, path, _ = request_line.split()
-        if method != 'GET':
-            conn.sendall(b"HTTP/1.1 405 Method Not Allowed\r\n\r\n")
-            return
-        build_and_send_response(conn, path)
+        req = c.recv(1024).decode('iso-8859-1')
+        if not req: return
+        m, p, _ = req.split()[:3]
+        if m != 'GET': c.sendall(b"HTTP/1.1 405\r\n\r\n"); return
+        send_resp(c, p)
     except Exception as e:
-        error_msg = f"<h1>500 Internal Server Error</h1><pre>{e}</pre>".encode()
-        header = (
-            "HTTP/1.1 500 Internal Server Error\r\n"
-            "Content-Type: text/html\r\n"
-            f"Content-Length: {len(error_msg)}\r\n"
-            "\r\n"
-        )
-        conn.sendall(header.encode() + error_msg)
-    finally:
-        conn.close()
+        c.sendall(f"HTTP/1.1 500\r\n\r\n{e}".encode())
+    finally: c.close()
 
-def main():
-    if len(sys.argv) < 2:
-        print('Usage: python server_multi.py <PORT>')
-        sys.exit(1)
+def main(port=8080):                       # fungsi utama
+    s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(('', port)); s.listen()
+    print(f"[Multi] Listen {port}")
+    while True:
+        c, a = s.accept()
+        Thread(target=worker, args=(c, a), daemon=True).start()  # jalanin thread
 
-    port = int(sys.argv[1])
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind(('', port))
-        server_socket.listen(5)
-        print(f"[Multi] Listening on port {port} ...")
-
-        while True:
-            conn, addr = server_socket.accept()
-            Thread(target=handle_client, args=(conn, addr), daemon=True).start()
-
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main(int(sys.argv[1]) if len(sys.argv) > 1 else 8080)

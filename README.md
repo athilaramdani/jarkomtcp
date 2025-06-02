@@ -1,55 +1,78 @@
+# Tugas Besar Jaringan Komputer Genap 2024/2025
 
-# TCP Web Server Project — Jaringan Komputer (Genap 2024/2025)
+## Tema: Web Server Berbasis TCP dengan Socket Programming
 
-## Berkas
+Repositori ini berisi tiga file utama untuk membangun dan menguji sebuah web server berbasis TCP:
 
-| File | Deskripsi |
-|------|-----------|
-| `server_single.py` | Server HTTP single‑threaded (menangani **1 koneksi** pada satu waktu) |
-| `server_multi.py`  | Server HTTP multithreaded (membuat **1 thread per koneksi**) |
-| `client.py`        | Klien HTTP sederhana untuk menguji server |
+* `client.py` : Klien TCP yang mengirimkan HTTP request.
+* `server_single.py` : Web server sederhana yang hanya melayani satu klien pada satu waktu.
+* `server_multi.py` : Versi multithreaded dari server untuk melayani beberapa klien secara bersamaan.
 
-## Cara Menjalankan
+---
 
-```bash
-# 1. Jalankan server (contoh port 6789)
-python server_single.py 6789          # versi single‑thread
-# atau
-python server_multi.py 6789           # versi multithread
+## Penjelasan Singkat
+
+### `client.py`
+
+* Klien menghubungi server menggunakan IP dan port tertentu.
+* Mengirimkan permintaan HTTP GET ke server untuk mengambil sebuah file.
+* Menampilkan hasil response dari server (isi file atau pesan error).
+
+### `server_single.py`
+
+* Hanya melayani satu koneksi klien dalam satu waktu.
+* Menerima permintaan file dan mengirimkannya jika ditemukan.
+* Jika file tidak ada, server akan merespons dengan 404 Not Found.
+
+### `server_multi.py`
+
+* Menggunakan threading untuk menangani beberapa koneksi klien sekaligus.
+* Setiap koneksi akan dibuat dalam thread terpisah agar bisa paralel.
+
+---
+
+## Cara Pengujian
+
+### 1. Siapkan File HTML
+
+Letakkan file HTML contoh seperti `HelloWorld.html` di folder yang sama dengan file server (`.py`). Contoh isi file:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head><title>Hello</title></head>
+  <body><h1>Hello World!</h1></body>
+</html>
 ```
 
-Letakkan file HTML (mis. `HelloWorld.html`) di **folder yang sama** dengan server.
+### 2. Jalankan Server
 
 ```bash
-# 2. Uji dengan browser
-http://<IP‑SERVER>:6789/HelloWorld.html
+# Untuk server single-threaded
+python server_single.py
+
+# Untuk server multithreaded
+python server_multi.py
 ```
 
-**atau** gunakan klien bawaan:
+Server akan berjalan di port 6789 secara default. Pastikan firewall tidak memblokir port tersebut.
+
+### 3. Jalankan Client
 
 ```bash
-# 3. Uji dengan client.py
-python client.py <IP‑SERVER> 6789 HelloWorld.html
+python client.py localhost 6789 HelloWorld.html
 ```
 
-### Contoh
+* `localhost` bisa diganti dengan IP server jika dari perangkat berbeda.
+* `6789` adalah port yang digunakan oleh server.
+* `HelloWorld.html` adalah file yang diminta.
 
-```bash
-# Terminal 1
-$ python server_multi.py 6789
-[Multi] Listening on port 6789 ...
+Jika berhasil, isi HTML akan muncul di terminal. Jika file tidak ditemukan, akan muncul pesan `404 Not Found`.
 
-# Terminal 2
-$ python client.py 127.0.0.1 6789 HelloWorld.html
-HTTP/1.1 200 OK
-Content-Type: text/html
-Content-Length: 52
-
-<html><body><h1>Hello, world!</h1></body></html>
-```
+---
 
 ## Catatan
 
-* Server *single‑thread* lebih sederhana tetapi mem‑block request lain sampai selesai.
-* Server *multithread* membuat thread baru untuk setiap request — lebih responsif jika ada beberapa klien bersamaan.
-* File selain `.html` juga bisa dilayani; `Content‑Type` otomatis diprediksi dengan modul `mimetypes`.
+* Server ini hanya mendukung HTTP GET sederhana.
+* Semua file dijalankan via terminal menggunakan Python 3.
+* Pastikan tidak ada server lain yang sedang menggunakan port 6789 saat pengujian.

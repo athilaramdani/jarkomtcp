@@ -1,60 +1,26 @@
 import socket
-import threading
+import os
 
-# Function to handle each client connection
-def handle_client(client_socket):
-    with client_socket:
-        print(f"Connected by {client_socket.getpeername()}")
+PORT = 6789  # Port yang digunakan server
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind(("", PORT))  # Bind ke semua IP
+server_socket.listen(1)  # Listen dengan backlog 1 (single request)
+print(f"Server listening on port {PORT}...")
 
-        # Open and read the HTML file
-        with open('index.html', 'r') as file:
-            html_content = file.read()
+while True:
+    conn, addr = server_socket.accept()  # Terima koneksi dari client
+    print(f"Connection from {addr}")
+    request = conn.recv(1024).decode()  # Terima request HTTP
+    print(request)
 
-        # Serve the HTML file to the client
-        while True:
-            request = client_socket.recv(1024)
-            if not request:
-                break
+    try:
+        filename = request.split()[1][1:]  # Ambil nama file dari request
+        with open(filename, 'rb') as f:
+            content = f.read()  # Baca isi file
+        header = "HTTP/1.1 200 OK\r\n\r\n".encode()
+        conn.send(header + content)  # Kirim header dan konten file
+    except:
+        msg = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found".encode()
+        conn.send(msg)  # Kirim error jika file tidak ditemukan
 
-            request = request.decode("utf-8")
-            print(f"Received: {request}")
-
-            # If the client sends "close", close the connection
-            if request.lower() == "close":
-                client_socket.send("closed".encode("utf-8"))
-                break
-
-            # Send the HTML content
-            client_socket.send(html_content.encode("utf-8"))
-
-    print(f"Connection to {client_socket.getpeername()} closed")
-
-
-def run_server():
-    # Create a socket object
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_ip = "127.0.0.1"
-    port = 8000
-
-    # Bind the socket to a specific address and port
-    server.bind((server_ip, port))
-    # Listen for incoming connections
-    server.listen(5)
-    print(f"Listening on {server_ip}:{port}")
-
-    while True:
-        # Accept incoming connections
-        client_socket, client_address = server.accept()
-        print(f"Accepted connection from {client_address[0]}:{client_address[1]}")
-
-        # Create a new thread to handle the client connection
-        client_thread = threading.Thread(target=handle_client, args=(client_socket,))
-        client_thread.start()
-
-
-def main():
-    run_server()
-
-
-if __name__ == "__main__":
-    main()
+    conn.close()  # Tutup koneksi setelah respons selesai

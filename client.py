@@ -1,34 +1,26 @@
+# client.py
+import sys
 import socket
 
-def run_client():
-    # Create a socket object
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_host = sys.argv[1]  # IP address server dari argumen
+server_port = int(sys.argv[2])  # Port server dari argumen
+filename = sys.argv[3]  # Nama file yang diminta dari server
 
-    server_ip = "127.0.0.1"  # Replace with the server's IP address
-    server_port = 8000  # Replace with the server's port number
+# Membuat socket TCP
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect((server_host, server_port))  # Koneksi ke server
 
-    # Establish connection with server
-    try:
-        client.connect((server_ip, server_port))
-        print(f"Connected to server at {server_ip}:{server_port}")
-    except ConnectionRefusedError:
-        print(f"Connection failed: Server not running at {server_ip}:{server_port}")
-        return
+# Mengirim request HTTP GET
+request = f"GET /{filename} HTTP/1.1\r\nHost: {server_host}\r\n\r\n"
+client_socket.send(request.encode())  # Kirim request ke server
 
-    # Send a request to the server to get the HTML content
-    request = "GET /index.html HTTP/1.1\r\nHost: {}\r\n\r\n".format(server_ip)
-    client.send(request.encode("utf-8"))
+# Terima respons dari server
+response = b""
+while True:
+    data = client_socket.recv(1024)  # Terima data dalam blok 1024 byte
+    if not data:
+        break
+    response += data
 
-    # Receive the response from the server
-    response = client.recv(4096).decode("utf-8")
-    print(f"Received:\n{response}")
-
-    # Close client socket (connection to the server)
-    client.close()
-    print("Connection to server closed")
-
-def main():
-    run_client()
-
-if __name__ == "__main__":
-    main()
+print(response.decode())  # Tampilkan hasil respons
+client_socket.close()  # Tutup koneksi

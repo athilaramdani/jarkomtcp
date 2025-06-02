@@ -1,64 +1,31 @@
 import socket
+import os
 import threading
 
-# Function to handle each client connection
-def handle_client(client_socket, client_address):
-    print(f"Connected by {client_address}")
+PORT = 6789  # Port server
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind(("", PORT))  # Bind ke semua IP
+server_socket.listen(5)  # Listen dengan backlog 5 (multi)
+print(f"Multithreaded server listening on port {PORT}...")
+
+def handle_client(conn, addr):
+    print(f"Handling client {addr}")
+    request = conn.recv(1024).decode()  # Terima request dari client
+    print(request)
 
     try:
-        # Open and read the HTML file
-        with open('index.html', 'r') as file:
-            html_content = file.read()
+        filename = request.split()[1][1:]  # Ambil nama file
+        with open(filename, 'rb') as f:
+            content = f.read()  # Baca file
+        header = "HTTP/1.1 200 OK\r\n\r\n".encode()
+        conn.send(header + content)  # Kirim header dan konten file
+    except:
+        msg = "HTTP/1.1 404 Not Found\r\n\r\nFile Not Found".encode()
+        conn.send(msg)  # Kirim error jika file tidak ditemukan
 
-        # Serve the HTML file to the client
-        while True:
-            request = client_socket.recv(1024)
-            if not request:
-                break
+    conn.close()  # Tutup koneksi
 
-            request = request.decode("utf-8")
-            print(f"Received: {request}")
-
-            # If the client sends "close", close the connection
-            if request.lower() == "close":
-                client_socket.send("closed".encode("utf-8"))
-                break
-
-            # Send the HTML content
-            client_socket.send(html_content.encode("utf-8"))
-
-    except Exception as e:
-        print(f"Error handling client {client_address}: {e}")
-    finally:
-        print(f"Connection to {client_address} closed")
-        client_socket.close()
-
-
-def run_server():
-    # Create a socket object
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_ip = "127.0.0.1"
-    port = 8000
-
-    # Bind the socket to a specific address and port
-    server.bind((server_ip, port))
-    # Listen for incoming connections
-    server.listen(5)
-    print(f"Listening on {server_ip}:{port}")
-
-    while True:
-        # Accept incoming connections
-        client_socket, client_address = server.accept()
-        print(f"Accepted connection from {client_address[0]}:{client_address[1]}")
-
-        # Create a new thread to handle the client connection
-        client_thread = threading.Thread(target=handle_client, args=(client_socket, client_address))
-        client_thread.start()
-
-
-def main():
-    run_server()
-
-
-if __name__ == "__main__":
-    main()
+while True:
+    conn, addr = server_socket.accept()  # Terima koneksi baru
+    thread = threading.Thread(target=handle_client, args=(conn, addr))  # Buat thread baru
+    thread.start()  # Mulai thread

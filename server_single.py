@@ -1,37 +1,60 @@
-# ================ server_single.py ================
-import socket, os, mimetypes          # modul wajib
+import socket
+import threading
 
-def send_resp(c, path):               # kirim file/404
-    path = '/index.html' if path == '/' else path
-    f = '.' + path                    # path lokal
-    if not os.path.isfile(f):         # kalau file ga ada
-        body = b"<h1>404 Not Found</h1>"
-        c.sendall(
-            f"HTTP/1.1 404\r\nContent-Type:text/html\r\nContent-Length:{len(body)}\r\n\r\n"
-            .encode() + body); return
-    data = open(f, 'rb').read()       # baca file
-    ct = mimetypes.guess_type(f)[0] or 'application/octet-stream'
-    c.sendall(
-        f"HTTP/1.1 200 OK\r\nContent-Type:{ct}\r\nContent-Length:{len(data)}\r\n\r\n"
-        .encode() + data)
+# Function to handle each client connection
+def handle_client(client_socket):
+    with client_socket:
+        print(f"Connected by {client_socket.getpeername()}")
 
-def main(port=8080):                  # fungsi utama
-    s = socket.socket()               # bikin socket TCP
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', port)); s.listen(1)   # dengar (backlog 1 cukup)
-    print(f"[Single] nunggu 1 klien di {port}")
-    c, addr = s.accept()              # terima satu klien
-    print(f"[Single] layani {addr}")
-    try:
-        req = c.recv(1024).decode('iso-8859-1')  # baca request
-        if not req: return
-        method, path, _ = req.split()[:3]        # parse baris 1
-        send_resp(c, path) if method == 'GET' else c.sendall(b"HTTP/1.1 405\r\n\r\n")
-    except Exception as e:            # tangkap error
-        c.sendall(f"HTTP/1.1 500\r\n\r\n{e}".encode())
-    finally:
-        c.close(); s.close()          # tutup klien & server
-        print("[Single] tugas selesai, server mati")
+        # Open and read the HTML file
+        with open('index.html', 'r') as file:
+            html_content = file.read()
 
-if __name__ == '__main__':
-    import sys; main(int(sys.argv[1]) if len(sys.argv) > 1 else 8080)
+        # Serve the HTML file to the client
+        while True:
+            request = client_socket.recv(1024)
+            if not request:
+                break
+
+            request = request.decode("utf-8")
+            print(f"Received: {request}")
+
+            # If the client sends "close", close the connection
+            if request.lower() == "close":
+                client_socket.send("closed".encode("utf-8"))
+                break
+
+            # Send the HTML content
+            client_socket.send(html_content.encode("utf-8"))
+
+    print(f"Connection to {client_socket.getpeername()} closed")
+
+
+def run_server():
+    # Create a socket object
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_ip = "127.0.0.1"
+    port = 8000
+
+    # Bind the socket to a specific address and port
+    server.bind((server_ip, port))
+    # Listen for incoming connections
+    server.listen(5)
+    print(f"Listening on {server_ip}:{port}")
+
+    while True:
+        # Accept incoming connections
+        client_socket, client_address = server.accept()
+        print(f"Accepted connection from {client_address[0]}:{client_address[1]}")
+
+        # Create a new thread to handle the client connection
+        client_thread = threading.Thread(target=handle_client, args=(client_socket,))
+        client_thread.start()
+
+
+def main():
+    run_server()
+
+
+if __name__ == "__main__":
+    main()
